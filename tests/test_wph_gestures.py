@@ -99,3 +99,20 @@ class WphGestureTests(unittest.IsolatedAsyncioTestCase):
         self.button._gesture_last_seen -= 2
         await self.replay("270110009801400a", "270110009701")
         self.assertEqual(self.events, [{"button": 1, "action": "press"}])
+
+    async def test_hold_updates_at_a_brightness_limit_are_not_dropped(self):
+        self.button.settings.input = 3
+        await self.replay(
+            "00011000162703ce0a01",
+            "2701100098010000",
+            "2701100098010000",
+            "00011000162703bd0a00",
+        )
+        self.assertEqual(
+            [event["action"] for event in self.events],
+            ["press", "dim", "dim", "release"],
+        )
+        self.assertEqual(
+            [event["brightness_delta"] for event in self.events if event["action"] == "dim"],
+            [0, 0],
+        )

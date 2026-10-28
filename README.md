@@ -2,6 +2,46 @@
 
 Python package for communicating with and controlling [Plejd](https://plejd.com) devices with [Home Assistant](https://home-assistant.io)
 
+## Button events
+
+Button listeners retain the existing `press` and `release` actions. Both the
+three-byte and observed five-byte button payloads use their final byte as the
+press/release flag. A quick tap may emit only `press`, so the absence of a release
+does not distinguish a tap from a button that is still being held.
+Listeners should filter `action`: WPH-01 now produces additional `click` and
+`dim` callbacks as well as the existing press/release callbacks.
+
+WPH-01 also sends native group state (`0x0097`) and level (`0x0098`) reports at
+its device address. When correlated with the pending button input, these expose
+two additional actions:
+
+| Action | Additional fields | Meaning |
+| --- | --- | --- |
+| `click` | `on` (boolean) | A short tap, confirmed by a native state report. |
+| `dim` | `brightness`, `brightness_delta` (integers) | A native level update during a hold. The first delta is zero because it establishes a baseline. |
+
+The native brightness belongs to the Plejd button's group; it is not necessarily
+the brightness of an external light. Consumers can use each `dim` event to send a
+small brightness step to another device. Repeated updates at the same level are
+retained, including at brightness limits. This lets an external light keep dimming
+without assuming its starting brightness matches the Plejd group.
+
+Release, another input on the same device, or a gap of more than 1.5 seconds
+disarms gesture correlation. A state report after a hold is not emitted as a
+click. Gesture detection is restricted to WPH-01; wired button behavior is
+unchanged. These sequences were captured and tested on WPH-01 firmware 4.41.3
+with no native load assigned. Other firmware versions have not been verified.
+Release packets are still not guaranteed for every short hold.
+
+### Tests
+
+Run the packet replay tests without Bluetooth hardware or cloud credentials:
+
+```sh
+python -m pip install -e . cryptography
+python -m unittest discover -s tests -v
+```
+
 ---
 
 Contributors not listed in git history - in no particular order:
